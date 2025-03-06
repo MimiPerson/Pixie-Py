@@ -1,5 +1,3 @@
-// filepath: d:\Projects\pixie-py\README.md
-
 # Pixie-Py
 
 Pixie-Py is a React application built with Vite and TypeScript, utilizing PixiJS for rendering and TailwindCSS for styling. The application integrates with Twitch to display and interact with chat messages in real-time.
