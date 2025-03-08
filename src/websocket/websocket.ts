@@ -2,7 +2,12 @@ import { getCharacterRefById } from "../components/characterRef";
 import { TwitchEvent } from "../types/TwitchEvent";
 const ws = new WebSocket("ws://localhost:3344");
 
-const ignoredUsers = ["streamelements", "nightbot", "cutecrystalcat"];
+const ignoredUsers = [
+  "streamelements",
+  "nightbot",
+  "cutecrystalcat",
+  "sery_bot",
+];
 const dbRequest = indexedDB.open("chatters", 9);
 
 dbRequest.onupgradeneeded = (event) => {

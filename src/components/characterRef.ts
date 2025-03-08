@@ -12,7 +12,7 @@ export function getCharacterRef(id: string): CharacterHandle | undefined {
 export function setCharacterData(chatters: Record<string, Chatter>) {
   Object.values(chatters).forEach((chatter) => {
     if (charactersRef.current) {
-      charactersRef.current[chatter.msg.id]?.setData(chatter);
+      charactersRef.current[chatter.msg.userId]?.setData(chatter);
     }
   });
 }
