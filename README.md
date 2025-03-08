@@ -1,54 +1,96 @@
-# React + TypeScript + Vite
+# Pixie-Py
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Pixie-Py is a React application built with Vite and TypeScript, utilizing PixiJS for rendering and TailwindCSS for styling. The application integrates with Twitch to display and interact with chat messages in real-time.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Real-time Twitch Chat Integration**: Displays chat messages from Twitch and allows interaction with chatters.
+- **PixiJS Rendering**: Utilizes PixiJS for high-performance rendering of graphical elements.
+- **TailwindCSS**: Uses TailwindCSS for styling.
+- **TypeScript**: Written in TypeScript for type safety and better developer experience.
 
-## Expanding the ESLint configuration
+## Project Structure
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- **src**: Contains the source code for the application.
+  - **components**: React components used in the application.
+  - **types**: TypeScript type definitions.
+  - **websocket**: WebSocket integration for real-time communication.
+- **public**: Static assets.
+- **index.html**: The main HTML file.
+- **package.json**: Project dependencies and scripts.
+- **tsconfig.json**: TypeScript configuration.
 
-```js
-export default tseslint.config({
-  extends: [
-    // Remove ...tseslint.configs.recommended and replace with this
-    ...tseslint.configs.recommendedTypeChecked,
-    // Alternatively, use this for stricter rules
-    ...tseslint.configs.strictTypeChecked,
-    // Optionally, add this for stylistic rules
-    ...tseslint.configs.stylisticTypeChecked,
-  ],
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
+## Getting Started
+
+### Prerequisites
+
+- Node.js (version 14 or higher)
+- bun or yarn
+
+### Installation
+
+1. Clone the repository:
+
+   ```sh
+   git clone https://github.com/yourusername/pixie-py.git
+   cd pixie-py
+   ```
+
+2. Install dependencies:
+   ```sh
+   bun install
+   # or
+   yarn install
+   ```
+
+### Running the Application
+
+To start the development server:
+
+```sh
+bun run dev
+# or
+yarn dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Building the Application
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+To build the application for production:
 
-export default tseslint.config({
-  plugins: {
-    // Add the react-x and react-dom plugins
-    'react-x': reactX,
-    'react-dom': reactDom,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended typescript rules
-    ...reactX.configs['recommended-typescript'].rules,
-    ...reactDom.configs.recommended.rules,
-  },
-})
+```sh
+bun run build
+# or
+yarn build
 ```
+
+### Linting
+
+To lint the codebase:
+
+```sh
+bun run lint
+# or
+yarn lint
+```
+
+### Previewing the Production Build
+
+To preview the production build:
+
+```sh
+bun run preview
+# or
+yarn preview
+```
+
+## License
+
+This project is licensed under the MIT License.
+
+## Acknowledgements
+
+- [Vite](https://vitejs.dev/)
+- [React](https://reactjs.org/)
+- [PixiJS](https://pixijs.com/)
+- [TailwindCSS](https://tailwindcss.com/)
+- [TypeScript](https://www.typescriptlang.org/)
