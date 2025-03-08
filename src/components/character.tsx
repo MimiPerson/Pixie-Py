@@ -1,6 +1,4 @@
-import { extend } from "@pixi/react";
-import { Assets, Container, Sprite, Text, Texture } from "pixi.js";
-import {
+import React, {
   useEffect,
   useRef,
   useState,
@@ -9,14 +7,13 @@ import {
 } from "react";
 import { Chatter } from "../types/Chatter";
 
-// Constants
+// Game Physics Constants
 const FALLING_SPEED = 4;
 const DRAG = 0.1;
+const JUMP_FORCE = { x: -25, y: -25 };
+const SPRITE_DIMENSIONS = { width: 32, height: 32 };
 
-// Extend PixiJS components
-extend({ Container, Text });
-
-// Types
+// Interface Definitions
 interface CharacterProps {
   name: string;
 }
@@ -41,29 +38,31 @@ export interface CharacterHandle {
 export const Character = forwardRef<CharacterHandle, CharacterProps>(
   function Character({ name }, ref) {
     // Refs
-    const windowRef = useRef<Window>(null);
-    const FLOOR_HEIGHT =
-      (windowRef.current?.screenY ?? window.innerHeight) - 45;
-    const spriteRef = useRef<Sprite>(null);
+    const spriteRef = useRef<HTMLImageElement>(null);
     const frameRef = useRef(0);
-    const containerRef = useRef<Container>(null);
-    const randomPosition = Math.random() * 1000;
 
-    // State
+    // Initial Position Setup
+    const initialX = Math.random() * window.innerWidth;
+    const randomPosition =
+      initialX > 150 ? initialX + Math.random() * 150 : 150;
+
+    // State Management
     const [data, setData] = useState<Chatter | undefined>(undefined);
-    const [texture, setTexture] = useState(Texture.EMPTY);
     const [velocity, setVelocity] = useState<Velocity>({ x: 0, y: 0 });
     const [position, setPosition] = useState<Position>({
-      x: randomPosition > 150 ? randomPosition + Math.random() * 150 : 150,
-      y: FLOOR_HEIGHT,
+      x: randomPosition,
+      y: window.innerHeight + (spriteRef.current?.height ?? 0),
     });
-    const [targetX, setTargetX] = useState<number | undefined>(undefined);
+    const [spriteScale] = useState(4);
+    const [spriteSource, setSpriteSource] = useState(`src/assets/1x.gif`);
+    const [targetX, setTargetX] = useState<number>();
     const [walking, setWalking] = useState(0);
     const [direction, setDirection] = useState(1);
     const [grounded, setGrounded] = useState(false);
     const [idle, setIdle] = useState(false);
     const [currentMessage, setCurrentMessage] = useState<string | undefined>();
 
+    // Expose methods through ref
     useImperativeHandle(ref, () => ({
       setData: (data: Chatter) => setData(data),
       getData: () => data,
@@ -71,58 +70,64 @@ export const Character = forwardRef<CharacterHandle, CharacterProps>(
       walkTo: (x: number) => setTargetX(x),
     }));
 
-    // Load character texture
+    // Random movement handler
     useEffect(() => {
-      if (texture === Texture.EMPTY) {
-        Assets.load("./src/assets/Idle.png").then(setTexture);
-      }
-    }, [texture]);
+      let isActive = true;
+      const handleRandomMovement = async () => {
+        if (grounded) {
+          const idleDelay = idle ? Math.random() * 10000 : 0;
 
-    // Set Random Target Position
-    useEffect(() => {
-      const setRandomTarget = async () => {
-        if (targetX === undefined && grounded) {
-          await new Promise<void>((resolve) =>
-            idle ? setTimeout(resolve, Math.random() * 10000) : resolve()
+          const timeoutPromise = new Promise<void>((resolve) =>
+            setTimeout(resolve, idleDelay < 500 ? 500 : idleDelay)
           );
-          setTargetX(Math.random() * 1000);
-          setIdle(true);
+          await timeoutPromise;
+          if (isActive) {
+            console.debug(
+              "setting IdleDelay to: ",
+              idleDelay < 500 ? 500 : idleDelay,
+              "ms"
+            );
+            setTargetX(Math.random() * window.innerWidth);
+            setIdle(true);
+          }
         }
       };
-      setRandomTarget();
+      handleRandomMovement();
+      return () => {
+        isActive = false;
+      };
     }, [targetX, grounded, idle]);
 
-    // Handle walking to target
+    // Walking direction handler
     useEffect(() => {
-      if (targetX) {
-        if (Math.abs(position.x - targetX) < 1) {
-          setTargetX(undefined);
+      const handleWalking = () => {
+        if (!targetX) return;
+
+        const reachedTarget = Math.abs(position.x - targetX) < 1;
+        if (reachedTarget) {
+          setTargetX(0);
           setWalking(0);
         } else {
           setWalking(position.x < targetX ? 1 : -1);
         }
-      }
+      };
+      handleWalking();
     }, [targetX, position.x]);
 
-    // Handle direction
+    // Character direction handler
     useEffect(() => {
-      if (walking !== 0) {
-        setDirection(walking * -1);
-      }
+      if (walking !== 0) setDirection(walking * -1);
     }, [walking]);
 
-    function jump() {
-      setVelocity(() => ({ x: -25, y: -25 }));
-      setPosition((prev) => ({ x: prev.x, y: prev.y - 5 }));
-      setGrounded(false);
-    }
-
-    // Game loop
+    // Physics and movement loop
     useEffect(() => {
       const updatePhysics = () => {
         setPosition((prev) => ({
           x: prev.x + velocity.x,
-          y: prev.y < FLOOR_HEIGHT ? prev.y + velocity.y : FLOOR_HEIGHT,
+          y:
+            prev.y < window.innerHeight
+              ? prev.y + velocity.y
+              : window.innerHeight,
         }));
 
         setVelocity((prev) => ({
@@ -130,58 +135,131 @@ export const Character = forwardRef<CharacterHandle, CharacterProps>(
           y: prev.y < FALLING_SPEED ? prev.y + FALLING_SPEED : prev.y,
         }));
 
-        if (position.y >= FLOOR_HEIGHT && !grounded) {
+        if (position.y >= window.innerHeight && !grounded) {
           setGrounded(true);
         }
       };
 
-      const gameLoop = () => {
-        updatePhysics();
-        frameRef.current = requestAnimationFrame(gameLoop);
-      };
-
-      frameRef.current = requestAnimationFrame(gameLoop);
-
+      frameRef.current = requestAnimationFrame(updatePhysics);
       return () => cancelAnimationFrame(frameRef.current);
-    }, [grounded, velocity, walking, position, targetX, FLOOR_HEIGHT]);
+    }, [grounded, velocity, walking, position, targetX]);
 
+    // Message timeout handler
     useEffect(() => {
-      const timer = setTimeout(() => {
+      const messageTimeout = setTimeout(() => {
         setCurrentMessage(undefined);
       }, 10000);
-      return () => clearTimeout(timer);
+      return () => clearTimeout(messageTimeout);
     }, [currentMessage]);
 
+    // Sprite loading
+    useEffect(() => {
+      const sprite = new Image();
+      sprite.onload = () => {
+        sprite.width = SPRITE_DIMENSIONS.width;
+        sprite.height = SPRITE_DIMENSIONS.height;
+
+        setSpriteSource(sprite.src);
+      };
+      sprite.src = "src/assets/Idle.png";
+    }, []);
+
+    const handleJump = () => {
+      setVelocity(() => JUMP_FORCE);
+      setPosition((prev) => ({ ...prev, y: prev.y - 5 }));
+      setGrounded(false);
+    };
+    useEffect(() => {
+      if (currentMessage) return;
+      setCurrentMessage(
+        "mewddddddddddddddddddddddddddddddddddddddddddddd" +
+          Math.floor(Math.random() * 10)
+      );
+    }, [currentMessage]);
+
+    // Collision detection function
+    const isOverlapping = (rect1: DOMRect, rect2: DOMRect) => {
+      return !(
+        rect1.right < rect2.left ||
+        rect1.left > rect2.right ||
+        rect1.bottom < rect2.top ||
+        rect1.top > rect2.bottom
+      );
+    };
+
+    // Example collision detection with another element
+    useEffect(() => {
+      const checkCollision = () => {
+        const spriteRect = spriteRef.current?.getBoundingClientRect();
+        const otherElement = document.getElementById("other-element");
+        const otherRect = otherElement?.getBoundingClientRect();
+
+        if (spriteRect && otherRect && isOverlapping(spriteRect, otherRect)) {
+          console.log("Collision detected!");
+        }
+      };
+
+      const interval = setInterval(checkCollision, 100);
+      return () => clearInterval(interval);
+    }, []);
+
     return (
-      <pixiContainer ref={containerRef} x={position.x} y={position.y}>
-        <pixiText
-          x={0}
-          y={-50}
-          text={name || "placeholder"}
-          style={{ fill: "white", fontSize: "20px" }}
-          anchor={0.5}
-        />
-        <pixiText
-          text={currentMessage || ""}
+      <div
+        style={{
+          position: "absolute",
+          left: position.x,
+          top: position.y - 85,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+        }}
+        onClick={handleJump}
+      >
+        <div
           style={{
-            fill: "white",
-            fontSize: "50px",
-            dropShadow: {
-              alpha: 1,
-              color: "0x000000",
-            },
+            position: "absolute",
+            bottom: SPRITE_DIMENSIONS.height + 50, // Adjust as needed
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
           }}
-          anchor={{ x: 0.5, y: 5 }}
-        />
-        <pixiSprite
-          onClick={jump}
-          scale={{ x: direction * 2.5, y: 2.5 }}
+        >
+          {currentMessage && (
+            <div
+              style={{
+                // Message display
+                marginBottom: "10px",
+                textSizeAdjust: "auto",
+                color: "white",
+                fontSize: "35px",
+                textShadow: "2px 2px black",
+              }}
+            >
+              {currentMessage}
+            </div>
+          )}
+          <div
+            style={{
+              // Name display
+              color: "white",
+              fontSize: "30px",
+            }}
+          >
+            {name || "placeholder"}
+          </div>
+        </div>
+        <img
           ref={spriteRef}
-          anchor={0.5}
-          eventMode={"static"}
-          texture={texture}
+          src={spriteSource}
+          alt="Character"
+          style={{
+            width: SPRITE_DIMENSIONS.width,
+            height: SPRITE_DIMENSIONS.height,
+            scale: spriteScale,
+            transform: `scaleX(${direction})`,
+          }}
         />
-      </pixiContainer>
+      </div>
     );
   }
 );
