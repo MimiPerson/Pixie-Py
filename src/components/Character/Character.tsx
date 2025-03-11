@@ -5,7 +5,10 @@ import {
   forwardRef,
   useImperativeHandle,
 } from "react";
-import { Chatter } from "../types/Chatter";
+import { Chatter } from "../../types/Chatter";
+import { TwitchEvent } from "../../types/TwitchEvent";
+import CharacterChatMessage from "./CharacterChatMessage";
+import SpriteSheetHandler from "../../helpers/SpriteSheetHandler";
 
 // Game Physics Constants
 const FALLING_SPEED = 4;
@@ -16,6 +19,8 @@ const SPRITE_DIMENSIONS = { width: 32, height: 32 };
 // Interface Definitions
 interface CharacterProps {
   name: string;
+  state: State;
+  newCurrentMessage?: TwitchEvent | undefined;
 }
 
 interface Position {
@@ -23,23 +28,42 @@ interface Position {
   y: number;
 }
 
+interface State {
+  position?: Position;
+  walking?: 1 | -1;
+  grounded?: boolean;
+  idle?: boolean;
+  targetX?: number;
+  velocity?: Velocity;
+  direction?: number;
+  spriteScale?: number;
+  spriteSource?: string;
+}
+
 interface Velocity {
   x: number;
   y: number;
+}
+interface Sprites {
+  [key: string]: string[] | undefined;
 }
 
 export interface CharacterHandle {
   setData: (data: Chatter) => void;
   getData: () => Chatter | undefined;
-  say: (message: string) => void;
+  say: (message: TwitchEvent) => void;
   walkTo: (x: number) => void;
+  getState: () => void;
 }
 
 export const Character = forwardRef<CharacterHandle, CharacterProps>(
-  function Character({ name }, ref) {
+  function Character({ name, state, newCurrentMessage }, ref) {
     // Refs
     const spriteRef = useRef<HTMLImageElement>(null);
     const frameRef = useRef(0);
+
+    // Character Sprites
+    const [sprites, setSprites] = useState<Sprites>({});
 
     // Initial Position Setup
     const initialX = Math.random() * window.innerWidth;
@@ -48,29 +72,72 @@ export const Character = forwardRef<CharacterHandle, CharacterProps>(
 
     // State Management
     const [data, setData] = useState<Chatter | undefined>(undefined);
-    const [velocity, setVelocity] = useState<Velocity>({ x: 0, y: 0 });
-    const [position, setPosition] = useState<Position>({
-      x: randomPosition,
-      y: window.innerHeight + (spriteRef.current?.height ?? 0),
-    });
+    const [velocity, setVelocity] = useState<Velocity>(
+      state.velocity || { x: 0, y: 0 }
+    );
+    const [position, setPosition] = useState<Position>(
+      state.position || { x: randomPosition, y: window.innerHeight }
+    );
     const [spriteScale] = useState(4);
     const [spriteSource, setSpriteSource] = useState(`src/assets/1x.gif`);
-    const [targetX, setTargetX] = useState<number>();
-    const [walking, setWalking] = useState(0);
-    const [direction, setDirection] = useState(1);
+    const [targetX, setTargetX] = useState<number | undefined>(
+      state.targetX || undefined
+    );
+    const [walking, setWalking] = useState(state.walking || 0);
+    const [direction, setDirection] = useState(state.direction || 1);
     const [grounded, setGrounded] = useState(false);
     const [idle, setIdle] = useState(false);
-    const [currentMessage, setCurrentMessage] = useState<string | undefined>();
+    const [currentMessage, setCurrentMessage] = useState<
+      TwitchEvent | undefined
+    >();
+    const [timeSinceLastMessage, setTimeSinceLastMessage] = useState<number>(0);
+    useEffect(() => {
+      console.log(sprites);
+
+      // if (data?.spriteSheets) {
+      // data.spriteSheets.forEach((sheet) => {
+      SpriteSheetHandler("src/assets/exampleSheet.png", 32, 32).then(
+        (spriteSheet) => {
+          console.log(spriteSheet[0]);
+          setSprites((prev) => ({
+            ...prev,
+            ["1"]: spriteSheet,
+          }));
+        }
+      );
+      // });
+      // }
+    }, [data]);
+
+    // Update current message when new message is received
+    useEffect(() => {
+      if (newCurrentMessage) {
+        setCurrentMessage(newCurrentMessage);
+      }
+    }, [newCurrentMessage]);
 
     // Expose methods through ref
     useImperativeHandle(ref, () => ({
       setData: (data: Chatter) => setData(data),
       getData: () => data,
-      say: (message: string) => setCurrentMessage(message),
+      getState: () => ({
+        position,
+        velocity,
+        walking,
+        grounded,
+        idle,
+        targetX,
+        direction,
+        spriteScale,
+        spriteSource,
+      }),
+      say: (message: TwitchEvent) => {
+        setCurrentMessage(message);
+      },
       walkTo: (x: number) => setTargetX(x),
     }));
 
-    // Random movement handler
+    // Handle random movement when grounded
     useEffect(() => {
       let isActive = true;
       const handleRandomMovement = async () => {
@@ -82,11 +149,6 @@ export const Character = forwardRef<CharacterHandle, CharacterProps>(
           );
           await timeoutPromise;
           if (isActive) {
-            console.debug(
-              "setting IdleDelay to: ",
-              idleDelay < 500 ? 500 : idleDelay,
-              "ms"
-            );
             setTargetX(Math.random() * window.innerWidth);
             setIdle(true);
           }
@@ -98,7 +160,7 @@ export const Character = forwardRef<CharacterHandle, CharacterProps>(
       };
     }, [targetX, grounded, idle]);
 
-    // Walking direction handler
+    // Handle walking direction based on target position
     useEffect(() => {
       const handleWalking = () => {
         if (!targetX) return;
@@ -114,7 +176,7 @@ export const Character = forwardRef<CharacterHandle, CharacterProps>(
       handleWalking();
     }, [targetX, position.x]);
 
-    // Character direction handler
+    // Update character direction based on walking state
     useEffect(() => {
       if (walking !== 0) setDirection(walking * -1);
     }, [walking]);
@@ -144,15 +206,16 @@ export const Character = forwardRef<CharacterHandle, CharacterProps>(
       return () => cancelAnimationFrame(frameRef.current);
     }, [grounded, velocity, walking, position, targetX]);
 
-    // Message timeout handler
+    // Handle message timeout
     useEffect(() => {
+      setTimeSinceLastMessage(new Date().getTime());
       const messageTimeout = setTimeout(() => {
         setCurrentMessage(undefined);
       }, 10000);
       return () => clearTimeout(messageTimeout);
     }, [currentMessage]);
 
-    // Sprite loading
+    // Load sprite based on character name
     useEffect(() => {
       const sprite = new Image();
       sprite.onload = () => {
@@ -161,47 +224,31 @@ export const Character = forwardRef<CharacterHandle, CharacterProps>(
 
         setSpriteSource(sprite.src);
       };
-      sprite.src = "src/assets/Idle.png";
-    }, []);
+      if (name.toLowerCase() === "zcmb1e_") sprite.src = "src/assets/max.png";
+      else sprite.src = "src/assets/Idle.png";
+    }, [name]);
 
+    // Delete character after 10 minutes of inactivity
+    useEffect(() => {
+      const deleteTimeout = setTimeout(() => {
+        if (
+          timeSinceLastMessage &&
+          new Date().getTime() - timeSinceLastMessage > 450000 &&
+          data?.msg.userId
+        ) {
+          console.log("delete");
+        }
+      }, 600000);
+
+      return () => clearTimeout(deleteTimeout);
+    }, [timeSinceLastMessage, data]);
+
+    // Handle character jump
     const handleJump = () => {
       setVelocity(() => JUMP_FORCE);
       setPosition((prev) => ({ ...prev, y: prev.y - 5 }));
       setGrounded(false);
     };
-    useEffect(() => {
-      if (currentMessage) return;
-      setCurrentMessage(
-        "mewddddddddddddddddddddddddddddddddddddddddddddd" +
-          Math.floor(Math.random() * 10)
-      );
-    }, [currentMessage]);
-
-    // Collision detection function
-    const isOverlapping = (rect1: DOMRect, rect2: DOMRect) => {
-      return !(
-        rect1.right < rect2.left ||
-        rect1.left > rect2.right ||
-        rect1.bottom < rect2.top ||
-        rect1.top > rect2.bottom
-      );
-    };
-
-    // Example collision detection with another element
-    useEffect(() => {
-      const checkCollision = () => {
-        const spriteRect = spriteRef.current?.getBoundingClientRect();
-        const otherElement = document.getElementById("other-element");
-        const otherRect = otherElement?.getBoundingClientRect();
-
-        if (spriteRect && otherRect && isOverlapping(spriteRect, otherRect)) {
-          console.log("Collision detected!");
-        }
-      };
-
-      const interval = setInterval(checkCollision, 100);
-      return () => clearInterval(interval);
-    }, []);
 
     return (
       <div
@@ -229,13 +276,10 @@ export const Character = forwardRef<CharacterHandle, CharacterProps>(
               style={{
                 // Message display
                 marginBottom: "10px",
-                textSizeAdjust: "auto",
-                color: "white",
-                fontSize: "35px",
-                textShadow: "2px 2px black",
+                display: "flex",
               }}
             >
-              {currentMessage}
+              <CharacterChatMessage message={currentMessage} />
             </div>
           )}
           <div

@@ -2,7 +2,16 @@ export interface Chatter {
   msg: msg;
   lastMessage: string;
   lastMessageTime: number;
+  spriteSheets?: SpriteSheets;
 }
+
+type SpriteSheets = Array<{
+  state: "idle" | "walking" | "falling";
+  width: number;
+  height: number;
+  url: string;
+}>;
+
 interface msg {
   badgeInfo: Array<[string, number]>;
   clientNonce: string;
