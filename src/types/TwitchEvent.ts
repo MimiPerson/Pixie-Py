@@ -3,29 +3,33 @@ export interface TwitchEvent {
   channel: string;
   user: string;
   message: string;
-  msg: Msg;
+  msg: msg;
 }
 
-interface Msg {
-  badgeInfo: BadgeInfo;
+interface msg {
+  badgeInfo: Array<[string, number]>;
+  clientNonce: string;
   color: string;
   displayName: string;
-  emotes: string|null;
+  emotes: string;
   firstMsg: string;
-  flags: string | null;
+  flags: null;
   id: string;
   mod: string;
+  replyParentDisplayName: string;
+  replyParentMsgBody: string;
+  replyParentMsgId: string;
+  replyParentUserId: string;
+  replyParentUserLogin: string;
+  replyThreadParentDisplayName: string;
+  replyThreadParentMsgId: string;
+  replyThreadParentUserId: string;
+  replyThreadParentUserLogin: string;
   returningChatter: string;
   roomId: string;
   subscriber: string;
   tmiSentTs: string;
   turbo: string;
   userId: string;
-  userType: string| null;
-}
-
-interface BadgeInfo {
-  broadcaster: number;
-  subscriber: number;
-  'destiny-2-final-shape-raid-race': number;
+  userType: string;
 }
